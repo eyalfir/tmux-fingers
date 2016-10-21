@@ -7,6 +7,7 @@ source $CURRENT_DIR/actions.sh
 source $CURRENT_DIR/hints.sh
 source $CURRENT_DIR/utils.sh
 source $CURRENT_DIR/help.sh
+source $CURRENT_DIR/debug.sh
 
 FINGERS_COPY_COMMAND=$(tmux show-option -gqv @fingers-copy-command)
 
@@ -59,7 +60,7 @@ function is_valid_input() {
   local input=$1
   local is_valid=1
 
-  if [[ $input == "" ]] || [[ $input == "<ESC>" ]] || [[ $input == "?" ]]; then
+  if [[ $input == "" ]] || [[ $input == "<ESC>" ]] || [[ $input == "<SPACE>" ]] || [[ $input == "<ENTER>" ]] || [[ $input == "?" ]]; then
     is_valid=1
   else
     for (( i=0; i<${#input}; i++ )); do
@@ -83,6 +84,8 @@ trap "handle_exit" EXIT
 
 compact_state=$FINGERS_COMPACT_HINTS
 help_state=0
+multi_state=0
+prev_multi_state=0
 
 pane_was_zoomed=$(is_pane_zoomed "$current_pane_id")
 show_hints_and_swap $current_pane_id $fingers_pane_id $compact_state
@@ -107,6 +110,17 @@ function toggle_help() {
   fi
 }
 
+function toggle_multi_state() {
+  prev_multi_state=$multi_state
+  if [[ $multi_state == "0" ]]; then
+    multi_state=1
+  else
+    multi_state=0
+  fi
+}
+
+OLDIFS=$IFS
+IFS=''
 while read -rsn1 char; do
   # Escape sequence, flush input
   if [[ "$char" == $'\x1b' ]]; then
@@ -120,7 +134,12 @@ while read -rsn1 char; do
     else
       continue
     fi
+  fi
 
+  if [[ $char == ' ' ]]; then
+    char="<SPACE>"
+  elif [[ $char == "" ]]; then
+    char="<ENTER>"
   fi
 
   if [[ ! $(is_valid_input "$char") == "1" ]]; then
@@ -136,8 +155,10 @@ while read -rsn1 char; do
     else
       exit
     fi
-  elif [[ $char == "" ]]; then
+  elif [[ $char == "<SPACE>" ]]; then
     toggle_compact_state
+  elif [[ $char == "<ENTER>" ]]; then
+    toggle_multi_state
   elif [[ $char == "?" ]]; then
     toggle_help
   else
@@ -150,16 +171,35 @@ while read -rsn1 char; do
     show_hints "$fingers_pane_id" $compact_state
   fi
 
-  result=$(lookup_match "$input")
+  if [[ ! $char == "<ENTER>" ]]; then
+    matched_hint=$(lookup_match "$input")
 
-  tmux display-message "$input"
+    tmux display-message "$input"
 
-  if [[ -z $result ]]; then
-    continue
+    if [[ -z $matched_hint ]]; then
+      continue
+    fi
   fi
 
-  copy_result "$result"
-  revert_to_original_pane "$current_pane_id" "$fingers_pane_id"
+  # not exiting multi-mode
+  if [[ ! ( $prev_multi_state == "1" && $multi_state == "0" ) ]]; then
+    if [[ $multi_state == "0" ]]; then
+      result=$matched_hint
+    else
+      result="$result $matched_hint"
+    fi
+  fi
 
-  exit 0
+  input=""
+
+  log "result '$result'"
+  log "multi_state '$multi_state'"
+
+  if [[ $multi_state == "0" || ( $prev_multi_state == "1" && $multi_state == "0" ) ]]; then
+    result=$(echo $result | sed "s/^ *//g")
+    copy_result "$result"
+    revert_to_original_pane "$current_pane_id" "$fingers_pane_id"
+    exit 0
+  fi
 done < /dev/tty
+IFS=$OLDIFS
