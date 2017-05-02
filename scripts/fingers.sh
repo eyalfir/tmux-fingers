@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 
+# TODO load fingers env
+eval "$(tmux show-env -g -s | grep ^FINGERS)"
+
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-source $CURRENT_DIR/config.sh
-source $CURRENT_DIR/actions.sh
 source $CURRENT_DIR/hints.sh
 source $CURRENT_DIR/utils.sh
 source $CURRENT_DIR/help.sh
 source $CURRENT_DIR/debug.sh
 
 FINGERS_COPY_COMMAND=$(tmux show-option -gqv @fingers-copy-command)
+HAS_TMUX_YANK=$([ "$(tmux list-keys | grep -c tmux-yank)" == "0" ]; echo $?)
 
 current_pane_id=$1
 fingers_pane_id=$2
-tmp_path=$3
+pane_input_temp=$3
+original_rename_setting=$4
 
 BACKSPACE=$'\177'
 
@@ -35,25 +38,8 @@ function handle_exit() {
   tmux swap-pane -s "$current_pane_id" -t "$fingers_pane_id"
   [[ $pane_was_zoomed == "1" ]] && zoom_pane "$current_pane_id"
   tmux kill-pane -t "$fingers_pane_id"
-  rm -rf "$tmp_path"
-}
-
-function copy_result() {
-  local result=$1
-
-  clear
-  echo -n "$result"
-  start_copy_mode
-  top_of_buffer
-  start_of_line
-  start_selection
-  end_of_line
-  cursor_left
-  copy_selection
-
-  if [ ! -z "$FINGERS_COPY_COMMAND" ]; then
-    echo -n "$result" | eval "nohup $FINGERS_COPY_COMMAND" > /dev/null
-  fi
+  tmux set-window-option automatic-rename "$original_rename_setting"
+  rm -rf "$pane_input_temp" "$pane_output_temp" "$match_lookup_table"
 }
 
 function is_valid_input() {
@@ -116,6 +102,22 @@ function toggle_multi_state() {
     multi_state=1
   else
     multi_state=0
+  fi
+}
+
+function copy_result() {
+  local result="$1"
+
+  tmux set-buffer "$result"
+
+  if [ ! -z "$FINGERS_COPY_COMMAND" ]; then
+    echo -n "$result" | eval "nohup $FINGERS_COPY_COMMAND" > /dev/null
+  fi
+
+  if [[ $HAS_TMUX_YANK = 1 ]]; then
+    tmux_yank_copy_command=$(tmux list-keys -t vi-copy | grep "vi-copy *y" | sed 's/.*copy-pipe "\(.*\)".*/\1/g')
+
+    echo -n "$result" | eval "nohup $tmux_yank_copy_command" > /dev/null
   fi
 }
 
@@ -191,6 +193,14 @@ while read -rsn1 char; do
   fi
 
   input=""
+
+  if [[ -z $result ]]; then
+    continue
+  fi
+
+  copy_result "$result"
+
+  revert_to_original_pane "$current_pane_id" "$fingers_pane_id"
 
   log "result '$result'"
   log "multi_state '$multi_state'"

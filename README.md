@@ -39,9 +39,9 @@ While in **[fingers]** mode, you can use the following shortcuts:
 
 # Requirements
 
-* bash 4+
 * tmux 2.1+ ( 2.2 recommended )
-* gawk ( optional but recommended )
+* bash 4+
+* gawk
 
 # Installation
 
@@ -78,13 +78,26 @@ Reload TMUX conf by running:
 
 # Configuration
 
-You can change the key that invokes **tmux-fingers**:
+NOTE: for changes to take effect, you'll need to source again your `.tmux.conf` file.
+
+* [@fingers-key](#fingers-key)
+* [@fingers-patterns-N](#fingers-patterns-N)
+* [@fingers-copy-command](#fingers-copy-command)
+* [@fingers-compact-hints](#fingers-compact-hints)
+* [@fingers-hint-position](#fingers-hint-position)
+* [@fingers-hint-position-nocompact](#fingers-hint-position-nocompact)
+* [@fingers-hint-format](#fingers-hint-format)
+* [@fingers-hint-format-nocompact](#fingers-hint-format-nocompact)
+* [@fingers-highlight-format](#fingers-highlight-format)
+* [@fingers-highlight-format-nocompact](#fingers-highlight-format-nocompact)
 
 ## @fingers-key
 
 `default: F`
 
-Customize how to enter copy mode. Always preceded by prefix: `prefix + @fingers-key`
+Customize how to enter fingers mode. Always preceded by prefix: `prefix + @fingers-key`
+
+For example:
 
 ```
 set -g @fingers-key F
@@ -109,10 +122,6 @@ Patterns are case insensitive, and grep's extended syntax ( ERE ) should be used
 If the introduced regexp contains an error, an error will be shown when
 invoking the plugin.
 
-It's recommended to install `gawk` for better support of custom
-patterns: some things like interval expressions do not work in built-in `awk`
-in OSX/BSD systems.
-
 ## @fingers-copy-command
 
 By default **tmux-fingers** will just yank matches using tmux clipboard ( or
@@ -128,7 +137,7 @@ set -g @fingers-copy-command 'xclip -selection clipboard'
 
 `default: 1`
 
-By default **tmux-fingers** will show hints a compact format. For example:
+By default **tmux-fingers** will show hints in a compact format. For example:
 
 <pre>
 /path/to/foo/bar/lol
@@ -152,6 +161,46 @@ cause line wraps, making it easier to follow.
 However for small hints this can be troublesome: a path as small as `/a/b`
 would have half of its original content concealed. If that's the case you can
 quickly toggle off compact mode by pressing `<space>`.
+
+## @fingers-hint-position
+
+`default: "left"`
+
+Control the position where the hint is rendered. Possible values are `"left"`
+and `"right"`.
+
+## @fingers-hint-position-nocompact
+
+
+`default: "right"`
+
+Same as above, used when `@fingers-compact-hints` is set to `0`.
+
+## @fingers-hint-format
+
+`default: "#[fg=yellow,bold]%s"`
+
+You can customize the colors using the same syntax used in `.tmux.conf` for styling the status bar. You'll need to include the `%s` placeholder in your custom format, that's where the content will be rendered.
+
+Check all supported features [here](https://github.com/morantron/tmux-printer).
+
+## @fingers-hint-format-nocompact
+
+`default: "#[fg=yellow,bold][%s]"`
+
+Same as above, used when `@fingers-compact-hints` is set to `0`.
+
+## @fingers-highlight-format
+
+`default: "#[fg=yellow,bold,dim]%s"`
+
+Custom format for the highlighted match. See [@fingers-hint-format](#fingers-hint-format) for more details.
+
+## @fingers-highlight-format-nocompact
+
+`default: "#[fg=yellow,bold,dim]%s"`
+
+Same as above, used when `@fingers-compact-hints` is set to `0`.
 
 # Acknowledgements and inspiration
 

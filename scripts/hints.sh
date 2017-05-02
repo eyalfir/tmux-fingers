@@ -7,9 +7,13 @@ match_lookup_table=$(fingers_tmp)
 pane_output_temp=$(fingers_tmp)
 flushed_input=0
 
+# exporting them so they can be properly deleted at fingers.sh handle_exit trap
+export match_lookup_table
+export pane_output_temp
+
 function lookup_match() {
   local input=$1
-  echo "$(cat $match_lookup_table | grep "^$input:" | sed "s/^$input://")"
+  echo "$(cat $match_lookup_table | grep "^$input:" | sed "s/^$input://" | head -n 1)"
 }
 
 function get_stdin() {
@@ -26,13 +30,13 @@ function show_hints() {
   local compact_hints=$2
 
   clear_screen "$fingers_pane_id"
-  get_stdin | COMPACT_HINTS=$compact_hints FINGER_PATTERNS=$PATTERNS __awk__ -f $CURRENT_DIR/hinter.awk 3> $match_lookup_table
+  get_stdin | FINGERS_COMPACT_HINTS="$compact_hints" gawk -f $CURRENT_DIR/hinter.awk 3> $match_lookup_table
 }
 
 function show_hints_and_swap() {
   current_pane_id=$1
   fingers_pane_id=$2
   compact_state=$3
-  tmux swap-pane -s "$current_pane_id" -t "$fingers_pane_id"
   show_hints "$fingers_pane_id" $compact_state
+  tmux swap-pane -s "$current_pane_id" -t "$fingers_pane_id"
 }
